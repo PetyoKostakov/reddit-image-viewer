@@ -65,52 +65,50 @@ function getSubImages(sub) {
 // const actions = Observable.empty();
 //
 // actions.subscribe(() => loading.style.visibility = "visible");
-const nextButtonClick$ = Rx.Observable.fromEvent(nextButton, 'click'); // getImages and take current one
-const backButtonClick$ = Rx.Observable.fromEvent(backButton, 'click'); //  getImages and take previous one
-const subSelectOnSelect$ = Rx.Observable.fromEvent(subSelect, 'change'); // get images again and reset counter
+
+const nextButtonClick$ = Observable.fromEvent(nextButton, 'click'); // getImages and take current one
+
+const backButtonClick$ = Observable.fromEvent(backButton, 'click'); //  getImages and take previous one
+const subSelectChange$ = Observable.concat(
+    Observable.of(subSelect.value),
+    Observable.fromEvent(subSelect, 'change').map(e => e.target.value) // get images again and reset counter
+);
 
 const actions$ = Observable.merge(
     nextButtonClick$,
     backButtonClick$,
-    subSelectOnSelect$
+    subSelectChange$
 );
 
-let images = getSubImages(subSelect.selectedOptions[0].value);
-let displayedImageIndex = 0;
+const offset$ = Observable.merge(
+    backButtonClick$.map(() => -1),
+    nextButtonClick$.map(() => 1)
+);
 
-function handleSubChange(index) {
-  images
-    .take(1)
-    .map((images) => images[index])
-    .subscribe( {
-      next(url) {
-        // hide the loading image
-        loading.style.visibility = "hidden";
-
-        // set Image source to URL
-        img.src = url;
-      },
-      error(e) {
-        alert("I'm having trouble loading the images for that sub. Please wait a while, reload, and then try again later.")
-      }
-    });
-}
-handleSubChange(displayedImageIndex);
+const index$ = Observable.concat(
+    Observable.of(0),
+    offset$.scan((acc, curr) => acc + curr)
+);
 
 actions$.subscribe(() => loading.style.visibility = "visible");
 
-subSelectOnSelect$.subscribe(function(e) {
-  images = getSubImages(e.target.selectedOptions[0].value);
-  displayedImageIndex = 0;
-  handleSubChange(displayedImageIndex);
-});
+images$ = subSelectChange$
+    .map((selectedValue) => {
+        return getSubImages(selectedValue).map(urlArr => {
+            return  index$.map(index => urlArr[index])
+        }).switch();
+    })
+    .switch()
+    .subscribe({
+        next(url) {
+            // hide the loading image
+            loading.style.visibility = "hidden";
 
-nextButtonClick$.subscribe((e) => {
-  displayedImageIndex++;
-  handleSubChange(displayedImageIndex);
-});
-
-backButtonClick$.subscribe(e => {
-  displayedImageIndex--;
-  handleSubChange(displayedImageIndex);
-});
+            // set Image source to URL
+            img.src = url;
+        },
+        error(e) {
+            console.log(e);
+            alert("I'm having trouble loading the images for that sub. Please wait a while, reload, and then try again later.")
+        }
+    });
