@@ -30,9 +30,12 @@ function getSubImages(sub) {
         fetch(url).
           then(res => res.json()).
           then(data => {
-            const images =
-              data.data.children.map(image => image.data.url);
+            const images = data.data.children
+                .filter(image => image.data.url.indexOf('.jpg') !== -1)
+                .map(image => image.data.url);
+
             localStorage.setItem(sub, JSON.stringify(images));
+
             return images;
           })));
   }
@@ -41,24 +44,73 @@ function getSubImages(sub) {
 // ---------------------- INSERT CODE  HERE ---------------------------
 // This "images" Observable is a dummy. Replace it with a stream of each
 // image in the current sub which is navigated by the user.
-const images = Observable.of("https://upload.wikimedia.org/wikipedia/commons/3/36/Hopetoun_falls.jpg");
-
-images.subscribe({
-  next(url) {
-    // hide the loading image
-    loading.style.visibility = "hidden";
-
-    // set Image source to URL
-    img.src = url;
-  },
-  error(e) {
-    alert("I'm having trouble loading the images for that sub. Please wait a while, reload, and then try again later.")
-  }
-})
+// const images = Observable.of("https://upload.wikimedia.org/wikipedia/commons/3/36/Hopetoun_falls.jpg");
+//
+// images.subscribe({
+//   next(url) {
+//     // hide the loading image
+//     loading.style.visibility = "hidden";
+//
+//     // set Image source to URL
+//     img.src = url;
+//   },
+//   error(e) {
+//     alert("I'm having trouble loading the images for that sub. Please wait a while, reload, and then try again later.")
+//   }
+// });
 
 // This "actions" Observable is a placeholder. Replace it with an
 // observable that notfies whenever a user performs an action,
 // like changing the sub or navigating the images
-const actions = Observable.empty();
+// const actions = Observable.empty();
+//
+// actions.subscribe(() => loading.style.visibility = "visible");
+const nextButtonClick$ = Rx.Observable.fromEvent(nextButton, 'click'); // getImages and take current one
+const backButtonClick$ = Rx.Observable.fromEvent(backButton, 'click'); //  getImages and take previous one
+const subSelectOnSelect$ = Rx.Observable.fromEvent(subSelect, 'change'); // get images again and reset counter
 
-actions.subscribe(() => loading.style.visibility = "visible");
+const actions$ = Observable.merge(
+    nextButtonClick$,
+    backButtonClick$,
+    subSelectOnSelect$
+);
+
+let images = getSubImages(subSelect.selectedOptions[0].value);
+let displayedImageIndex = 0;
+
+function handleSubChange(index) {
+  images
+    .take(1)
+    .map((images) => images[index])
+    .subscribe( {
+      next(url) {
+        // hide the loading image
+        loading.style.visibility = "hidden";
+
+        // set Image source to URL
+        img.src = url;
+      },
+      error(e) {
+        alert("I'm having trouble loading the images for that sub. Please wait a while, reload, and then try again later.")
+      }
+    });
+}
+handleSubChange(displayedImageIndex);
+
+actions$.subscribe(() => loading.style.visibility = "visible");
+
+subSelectOnSelect$.subscribe(function(e) {
+  images = getSubImages(e.target.selectedOptions[0].value);
+  displayedImageIndex = 0;
+  handleSubChange(displayedImageIndex);
+});
+
+nextButtonClick$.subscribe((e) => {
+  displayedImageIndex++;
+  handleSubChange(displayedImageIndex);
+});
+
+backButtonClick$.subscribe(e => {
+  displayedImageIndex--;
+  handleSubChange(displayedImageIndex);
+});
